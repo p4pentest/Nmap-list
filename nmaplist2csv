@@ -1,0 +1,62 @@
+#!/bin/bash
+
+echo "Enter Config Files Path"
+read file
+
+c=`wc -l $file | cut -d " " -f1`
+k=1
+
+echo "IP Address@Port@Protocol@Service" >  port_info
+
+for (( i=1 ; i <= $c ; i++ ))
+do
+	subnet=`sed -n ''$i'p' $file`
+	nmap $subnet >> output
+	
+	len=`cat output | wc -l`
+	ipc=`cat output | grep -Po "\d+\.\d+\.\d+\.\d+" | wc -l`
+
+	for (( j=1 ; j <= $ipc ; j++ ))
+	do
+		ip=`cat output | grep -Po "\d+\.\d+\.\d+\.\d+" --line-number | sed -n ''$j'p' | grep -Po "\d+\.\d+\.\d+\.\d+"`
+		line1=`cat output | grep -Po "\d+\.\d+\.\d+\.\d+" --line-number | sed -n ''$j'p' | cut -d ":" -f1`
+
+		check=`expr "$j" + "$k"`
+		if [ "$check" -gt "$ipc" ]
+		then
+			line2=`echo $len`
+		else
+			line2=`cat output | grep -Po "\d+\.\d+\.\d+\.\d+" --line-number | sed -n ''$check'p' | cut -d ":" -f1`
+		fi
+
+		m=`echo $line1`
+		for (( ; m < $line2 ; m++ ))
+		do
+			text=`cat output | sed -n ''$m'p'`
+			echo $text >> output_"$ip"
+		done
+	
+	
+		count=`cat output_"$ip" | grep "open" | wc -l`
+		f=0
+		while [ "$f" != "$count" ]
+		do
+			f=`expr "$f" + "$k"`
+			port=`cat output_"$ip" | grep open | sed -n ''$f'p' | awk '{print $1}' | cut -d "/" -f1`
+			prot=`cat output_"$ip" | grep open | sed -n ''$f'p' | awk '{print $1}' | cut -d "/" -f2`
+			serv=`cat output_"$ip" | grep open | sed -n ''$f'p' | awk '{print $3}'`
+			ver=`cat output_"$ip" | grep open | sed -n ''$f'p' | awk '{print $4}'`
+			echo $ip"@"$port"@"$prot"@"$serv >> port_info
+		done
+		cat output_"$ip" >> nmap_log
+		rm output_"$ip"
+	done
+
+	stat=`expr "$c" - "$i"`
+	echo $stat "IP / subnet are left..."
+done
+
+echo
+echo "Script execution complete !!!"
+echo "Please zip this folder and send it to 'soc@justdial.com'"
+echo
